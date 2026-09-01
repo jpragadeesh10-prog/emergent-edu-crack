@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, MessageSquareText, Code2, Trophy, Video,
-  Users, BookOpen, LogOut, Dna, Menu, X,
+  Users, BookOpen, LogOut, Dna, Menu, X, Swords,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -11,6 +11,7 @@ const nav = [
   { to: "/tutor", label: "AI Tutor", icon: MessageSquareText },
   { to: "/compiler", label: "Code Lab", icon: Code2 },
   { to: "/quiz", label: "Quiz Arena", icon: Trophy },
+  { to: "/battle", label: "Group Battle", icon: Swords },
   { to: "/interview", label: "Mock Interview", icon: Video },
   { to: "/friends", label: "Friends", icon: Users },
   { to: "/subjects", label: "Subjects", icon: BookOpen },
@@ -38,8 +39,8 @@ export default function Layout() {
         <div className="px-6 py-6 flex items-center gap-3 border-b border-slate-800">
           <div className="w-9 h-9 orb" />
           <div>
-            <p className="font-display font-bold text-lg leading-none">LearnVerse</p>
-            <p className="text-[10px] font-mono text-indigo-400 tracking-widest">SIH · AI TUTOR</p>
+            <p className="font-display font-bold text-lg leading-none">Edu-Crack</p>
+            <p className="text-[10px] font-mono text-indigo-400 tracking-widest">AI LEARNING</p>
           </div>
         </div>
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
@@ -94,7 +95,7 @@ export default function Layout() {
           <button onClick={() => setOpen(!open)} data-testid="menu-toggle" className="text-slate-300">
             {open ? <X /> : <Menu />}
           </button>
-          <span className="font-display font-bold">LearnVerse</span>
+          <span className="font-display font-bold">Edu-Crack</span>
         </div>
         <main className="p-5 lg:p-10 max-w-[1400px] mx-auto relative z-10">
           <Outlet />

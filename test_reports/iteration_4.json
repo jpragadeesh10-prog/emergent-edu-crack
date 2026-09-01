@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 4 tested: Rename LearnVerse->Edu-Crack (landing header/footer, sidebar, GET /api/ = 'Edu-Crack API'), Group Battle backend (create/join/start/state/questions/answer + ranking + 403 non-host + 404 bad code) and UI (create -> lobby -> battle-code -> start -> 5 answers -> battle-results with Play Again), AI Tutor pause/stop (speak-btn -> while speaking pause-btn-<i>+stop-btn-<i> appear; stop returns to Listen), Mock Interview pause/stop/end (pause-speaking-btn + stop-speaking-btn while speaking -> replay-question-btn after stop -> end-interview-btn resets back to start screen). Backend pytest 36/36 passed in ~19s (2 new tests added: TestRename.test_root_message, TestBattle.test_full_flow_two_players verifying guest score=5 host score=0 status='finished', TestBattle.test_join_invalid_code=404). Regression suite intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py continues to grow (~1200+ lines with battle routes). Extract battle endpoints into /app/backend/routers/battle.py — this is the 4th feature added to the monolith.",
+    "Battle: gen_questions retries once on any exception (bare except catches JSONDecodeError, network, auth). Fine for MVP but logs are swallowed — add logger.warning for observability.",
+    "Battle: no cleanup of stale battles. Battles/players collections will grow indefinitely. Add TTL index on created_at (e.g. 24h) or a housekeeping task.",
+    "Battle: /battle/{code} is polled every 1.5s per client with no ETag/If-None-Match; for larger rooms this is chatty. Consider a WebSocket or long-poll upgrade.",
+    "Battle: /battle/answer trusts client-provided time_ms. A malicious client could send time_ms=0 to always rank first among ties. Consider server-side timing based on started_at + q_index.",
+    "Battle: 'start' allowed with 0 other players (host alone) — verified single-player flow works, but UI copy says 'Race friends head-to-head' which may confuse users starting solo.",
+    "Frontend Battle.js polls even after 'finished' — after status=='finished' the interval should stop to save network."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py", "/app/test_reports/iteration_4.json"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "ravi_test@example.com / pass1234; iteration created transient battle_*/streak_* users",
+  "seed_data_creation": "Battle test uses two accounts: seed user (ravi_test) as host + fresh registered guest. Correct answers fetched directly from mongo db.battles for scoring validation.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Full pytest suite: `pytest /app/backend/tests/backend_test.py -v` (36 tests, ~19s). New Battle tests: TestBattle (2 tests), TestRename (1). For UI battle single-player: subject/difficulty -> create-battle-btn -> lobby (battle-code visible) -> start-battle-btn -> answer 5 x battle-opt-0 -> battle-results. Interviewer TTS returns quickly (~2-3s); pause/stop buttons only visible while speaking===true. Tutor speak-btn-<i> triggers TTS; pause-btn-<i> toggles paused label but audio can complete before toggle registers if text is short — use longer prompt if verifying label toggle. Emergent LLM key working."
+}

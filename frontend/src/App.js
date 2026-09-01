@@ -11,6 +11,7 @@ import Dashboard from "@/pages/Dashboard";
 import Tutor from "@/pages/Tutor";
 import Compiler from "@/pages/Compiler";
 import Quiz from "@/pages/Quiz";
+import Battle from "@/pages/Battle";
 import Interview from "@/pages/Interview";
 import Friends from "@/pages/Friends";
 import Subjects from "@/pages/Subjects";
@@ -67,6 +68,7 @@ function AppRouter() {
         <Route path="/tutor" element={<Tutor />} />
         <Route path="/compiler" element={<Compiler />} />
         <Route path="/quiz" element={<Quiz />} />
+        <Route path="/battle" element={<Battle />} />
         <Route path="/interview" element={<Interview />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/subjects" element={<Subjects />} />

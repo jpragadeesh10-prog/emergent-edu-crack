@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { Play, Loader2, Terminal, Code2, FileCode } from "lucide-react";
 
 const LANGS = [
-  { id: "python", label: "Python", sample: "print('Hello LearnVerse')\nfor i in range(3):\n    print('square', i*i)" },
-  { id: "javascript", label: "JavaScript", sample: "console.log('Hello LearnVerse');\n[1,2,3].forEach(n => console.log(n*n));" },
-  { id: "c", label: "C", sample: "#include <stdio.h>\nint main(){ printf(\"Hello LearnVerse\\n\"); return 0; }" },
-  { id: "cpp", label: "C++", sample: "#include <iostream>\nusing namespace std;\nint main(){ cout << \"Hello LearnVerse\" << endl; return 0; }" },
-  { id: "java", label: "Java", sample: "public class Main {\n  public static void main(String[] a){\n    System.out.println(\"Hello LearnVerse\");\n  }\n}" },
+  { id: "python", label: "Python", sample: "print('Hello Edu-Crack')\nfor i in range(3):\n    print('square', i*i)" },
+  { id: "javascript", label: "JavaScript", sample: "console.log('Hello Edu-Crack');\n[1,2,3].forEach(n => console.log(n*n));" },
+  { id: "c", label: "C", sample: "#include <stdio.h>\nint main(){ printf(\"Hello Edu-Crack\\n\"); return 0; }" },
+  { id: "cpp", label: "C++", sample: "#include <iostream>\nusing namespace std;\nint main(){ cout << \"Hello Edu-Crack\" << endl; return 0; }" },
+  { id: "java", label: "Java", sample: "public class Main {\n  public static void main(String[] a){\n    System.out.println(\"Hello Edu-Crack\");\n  }\n}" },
 ];
 
 export default function Compiler() {

@@ -28,7 +28,7 @@ export default function Login() {
       } else {
         await register(form);
       }
-      toast.success("Welcome to LearnVerse!");
+      toast.success("Welcome to Edu-Crack!");
       navigate("/dashboard");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Something went wrong");

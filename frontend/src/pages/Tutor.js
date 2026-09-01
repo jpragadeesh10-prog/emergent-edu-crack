@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import MicButton from "@/components/MicButton";
 import {
   Send, Volume2, VolumeX, Loader2, Sparkles, RefreshCw, Repeat2, Search, GraduationCap,
+  Pause, Play, Square,
 } from "lucide-react";
 
 function renderContent(text) {
@@ -44,6 +45,7 @@ export default function Tutor() {
   const [teacher, setTeacher] = useState("prof");
   const [mode, setMode] = useState("solve");
   const [speaking, setSpeaking] = useState(null);
+  const [paused, setPaused] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
   const endRef = useRef(null);
   const audioRef = useRef(null);
@@ -78,13 +80,14 @@ export default function Tutor() {
   const speak = async (text, idx) => {
     try {
       setSpeaking(idx);
+      setPaused(false);
       const voice = catalog?.teachers.find((t) => t.id === teacher)?.voice || "nova";
       const res = await api.post("/tts", { text, voice });
       const url = process.env.REACT_APP_BACKEND_URL + res.data.url;
       if (audioRef.current) audioRef.current.pause();
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.onended = () => setSpeaking(null);
+      audio.onended = () => { setSpeaking(null); setPaused(false); };
       await audio.play();
     } catch (e) {
       toast.error("Voice generation failed");
@@ -95,6 +98,17 @@ export default function Tutor() {
   const newChat = () => {
     setMessages([]);
     setSessionId(`s_${Date.now()}`);
+  };
+
+  const stopSpeaking = () => {
+    if (audioRef.current) { audioRef.current.pause(); try { audioRef.current.currentTime = 0; } catch {} }
+    setSpeaking(null); setPaused(false);
+  };
+
+  const togglePause = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) { a.play(); setPaused(false); } else { a.pause(); setPaused(true); }
   };
 
   const suggestions = [
@@ -176,11 +190,24 @@ export default function Tutor() {
                 )}
               </div>
               {m.role === "assistant" && m.content && (
-                <button onClick={() => speak(m.content, i)} data-testid={`speak-btn-${i}`}
-                  className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
-                  {speaking === i ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  {speaking === i ? "Speaking…" : "Listen"}
-                </button>
+                speaking === i ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <button onClick={togglePause} data-testid={`pause-btn-${i}`}
+                      className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+                      {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                      {paused ? "Resume" : "Pause"}
+                    </button>
+                    <button onClick={stopSpeaking} data-testid={`stop-btn-${i}`}
+                      className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors">
+                      <Square className="w-3.5 h-3.5 fill-current" /> Stop
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => speak(m.content, i)} data-testid={`speak-btn-${i}`}
+                    className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+                    <Volume2 className="w-3.5 h-3.5" /> Listen
+                  </button>
+                )
               )}
             </div>
           </div>

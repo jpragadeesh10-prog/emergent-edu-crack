@@ -34,7 +34,7 @@ export default function Landing() {
       <header className="relative z-10 max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 orb" />
-          <span className="font-display font-bold text-xl">LearnVerse</span>
+          <span className="font-display font-bold text-xl">Edu-Crack</span>
         </div>
         <button
           onClick={() => navigate(user ? "/dashboard" : "/login")}
@@ -53,7 +53,7 @@ export default function Landing() {
           transition={{ duration: 0.7 }}
         >
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-xs font-mono tracking-widest text-indigo-300 mb-6">
-            <Sparkles className="w-3.5 h-3.5" /> SMART INDIA HACKATHON PROJECT
+            <Sparkles className="w-3.5 h-3.5" /> AI-POWERED LEARNING FOR EVERY STUDENT
           </div>
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.05]">
             Your personal <span className="text-gradient">AI professor</span> for every subject.
@@ -139,7 +139,7 @@ export default function Landing() {
       </section>
 
       <footer className="relative z-10 border-t border-slate-800 py-8 text-center text-sm text-slate-500">
-        Built for Smart India Hackathon · LearnVerse © 2026
+        Edu-Crack © 2026 · Learn. Practice. Crack it.
       </footer>
     </div>
   );

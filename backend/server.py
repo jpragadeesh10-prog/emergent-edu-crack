@@ -219,7 +219,7 @@ def build_system_prompt(subject, language, teacher_id, mode):
     persona = f"You are {teacher['name']}. Persona: {teacher['style']}"
     base = (
         f"{persona}\n\n"
-        "You are LearnVerse AI, an expert tutor with deep, accurate knowledge across ALL subjects: "
+        "You are Edu-Crack AI, an expert tutor with deep, accurate knowledge across ALL subjects: "
         "Computer Science (DSA, OS, DBMS, Networks, AI/ML, Cyber Security, Cloud, Web/Mobile Dev, "
         "Compiler Design, Distributed Systems, Blockchain, IoT), Engineering (Maths, Physics, Chemistry, "
         "Mechanical, Electrical, Civil, Robotics, Thermodynamics, Fluid Mechanics), high-level Mathematics "
@@ -848,7 +848,7 @@ async def interview_answer(body: InterviewAnswerIn, user: dict = Depends(get_cur
 
 @api_router.get("/")
 async def root():
-    return {"message": "LearnVerse API"}
+    return {"message": "Edu-Crack API"}
 
 
 # ---------------------------------------------------------------------------
@@ -1069,6 +1069,152 @@ async def interview_video(record_id: str, auth: str = None):
         raise HTTPException(status_code=404, detail="Video not found")
     data, ctype = await asyncio.to_thread(get_object, rec["video_path"])
     return Response(content=data, media_type=ctype)
+
+
+# ---------------------------------------------------------------------------
+# Group Battle — live head-to-head quiz race
+# ---------------------------------------------------------------------------
+async def gen_questions(subject: str, difficulty: str):
+    sys = ("Return ONLY valid JSON, no fences: "
+           "{\"questions\":[{\"q\":\"...\",\"options\":[\"a\",\"b\",\"c\",\"d\"],\"answer\":0}]}. "
+           "Exactly 5 crisp multiple-choice questions, each answerable in ~15 seconds.")
+    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"battle_{uuid.uuid4().hex}",
+                   system_message=sys).with_model("openai", "gpt-5.4")
+    prompt = f"5-question quiz on '{subject}' at {difficulty} difficulty."
+
+    async def _g():
+        resp = await chat.send_message(UserMessage(text=prompt))
+        raw = re.sub(r"^```(json)?|```$", "", resp.strip()).strip()
+        return json.loads(raw)["questions"][:5]
+    try:
+        return await _g()
+    except Exception:
+        return await _g()
+
+
+def _player_view(p):
+    return {"user_id": p["user_id"], "name": p["name"], "picture": p.get("picture", ""),
+            "score": p.get("score", 0), "answered": len(p.get("answers", [])),
+            "total_ms": p.get("total_ms", 0), "finished": p.get("finished", False)}
+
+
+class BattleCreateIn(BaseModel):
+    subject: str
+    difficulty: Optional[str] = "medium"
+
+
+class BattleCodeIn(BaseModel):
+    code: str
+
+
+class BattleAnswerIn(BaseModel):
+    code: str
+    q_index: int
+    answer: int
+    time_ms: int
+
+
+@api_router.post("/battle/create")
+async def battle_create(body: BattleCreateIn, user: dict = Depends(get_current_user)):
+    questions = await gen_questions(body.subject, body.difficulty)
+    if not questions:
+        raise HTTPException(status_code=500, detail="Could not create battle, try again")
+    code = uuid.uuid4().hex[:6].upper()
+    battle = {"id": uuid.uuid4().hex, "code": code, "host_id": user["user_id"],
+              "subject": body.subject, "difficulty": body.difficulty,
+              "questions": questions, "status": "waiting",
+              "created_at": now_utc().isoformat(), "started_at": None}
+    await db.battles.insert_one(dict(battle))
+    await db.battle_players.insert_one({
+        "code": code, "user_id": user["user_id"], "name": user["name"],
+        "picture": user.get("picture", ""), "answers": [], "score": 0,
+        "total_ms": 0, "finished": False, "joined_at": now_utc().isoformat()})
+    return {"code": code, "subject": body.subject}
+
+
+@api_router.post("/battle/join")
+async def battle_join(body: BattleCodeIn, user: dict = Depends(get_current_user)):
+    code = body.code.strip().upper()
+    battle = await db.battles.find_one({"code": code}, {"_id": 0})
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    if battle["status"] != "waiting":
+        raise HTTPException(status_code=400, detail="Battle already started")
+    exists = await db.battle_players.find_one({"code": code, "user_id": user["user_id"]}, {"_id": 0})
+    if not exists:
+        await db.battle_players.insert_one({
+            "code": code, "user_id": user["user_id"], "name": user["name"],
+            "picture": user.get("picture", ""), "answers": [], "score": 0,
+            "total_ms": 0, "finished": False, "joined_at": now_utc().isoformat()})
+    return {"code": code, "subject": battle["subject"]}
+
+
+@api_router.post("/battle/start")
+async def battle_start(body: BattleCodeIn, user: dict = Depends(get_current_user)):
+    code = body.code.strip().upper()
+    battle = await db.battles.find_one({"code": code}, {"_id": 0})
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    if battle["host_id"] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Only the host can start")
+    await db.battles.update_one({"code": code},
+                                {"$set": {"status": "active", "started_at": now_utc().isoformat()}})
+    return {"ok": True}
+
+
+@api_router.get("/battle/{code}")
+async def battle_state(code: str, user: dict = Depends(get_current_user)):
+    code = code.strip().upper()
+    battle = await db.battles.find_one({"code": code}, {"_id": 0})
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    players = await db.battle_players.find({"code": code}, {"_id": 0}).to_list(20)
+    ranked = sorted([_player_view(p) for p in players],
+                    key=lambda x: (-x["score"], x["total_ms"] if x["finished"] else 10**12))
+    all_done = len(players) > 0 and all(p.get("finished") for p in players)
+    if all_done and battle["status"] != "finished":
+        await db.battles.update_one({"code": code}, {"$set": {"status": "finished"}})
+        battle["status"] = "finished"
+    return {"code": code, "subject": battle["subject"], "status": battle["status"],
+            "host_id": battle["host_id"], "is_host": battle["host_id"] == user["user_id"],
+            "num_questions": len(battle["questions"]), "players": ranked}
+
+
+@api_router.get("/battle/{code}/questions")
+async def battle_questions(code: str, user: dict = Depends(get_current_user)):
+    code = code.strip().upper()
+    battle = await db.battles.find_one({"code": code}, {"_id": 0})
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    if battle["status"] == "waiting":
+        raise HTTPException(status_code=400, detail="Battle not started")
+    return {"questions": [{"q": q["q"], "options": q["options"]} for q in battle["questions"]]}
+
+
+@api_router.post("/battle/answer")
+async def battle_answer(body: BattleAnswerIn, user: dict = Depends(get_current_user)):
+    code = body.code.strip().upper()
+    battle = await db.battles.find_one({"code": code}, {"_id": 0})
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    player = await db.battle_players.find_one({"code": code, "user_id": user["user_id"]}, {"_id": 0})
+    if not player:
+        raise HTTPException(status_code=404, detail="Not in this battle")
+    answers = player.get("answers", [])
+    if any(a["q"] == body.q_index for a in answers):
+        return {"ok": True, "score": player.get("score", 0)}  # ignore duplicates
+    correct = body.answer == battle["questions"][body.q_index]["answer"]
+    answers.append({"q": body.q_index, "chosen": body.answer, "correct": correct, "time_ms": body.time_ms})
+    score = sum(1 for a in answers if a["correct"])
+    total_ms = sum(a["time_ms"] for a in answers)
+    finished = len(answers) >= len(battle["questions"])
+    await db.battle_players.update_one(
+        {"code": code, "user_id": user["user_id"]},
+        {"$set": {"answers": answers, "score": score, "total_ms": total_ms, "finished": finished}})
+    if finished:
+        subj = battle["subject"] if battle["subject"] in ALL_SUBJECTS else "Algorithms"
+        await record_activity(user["user_id"], subj, xp=score * 12)
+    return {"ok": True, "correct": correct, "score": score, "finished": finished}
 
 
 app.include_router(api_router)

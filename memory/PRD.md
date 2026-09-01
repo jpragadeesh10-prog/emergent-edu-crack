@@ -41,7 +41,10 @@ tracking · Time Machine · quizzes+badges+leaderboard · friends+search · mock
 - [x] Streak Rewards: 'Unstoppable' badge + 100 bonus XP at 7-day streak, celebrated on the daily card
 - [x] Interview Recording: sessions recorded to object storage, 'Past Interviews' history with video replay + feedback
 - [x] Voice Read-Aloud: auto-speak toggle in AI Tutor reads each answer aloud after streaming
-- Tested: backend 33/33 pytest pass, frontend E2E 100% (iterations 1-3)
+- [x] Group Battle: live head-to-head quiz race via room code, live standings, fastest-correct wins
+- [x] Voice controls: Pause + Stop for AI Tutor voice; Pause/Stop + End for Mock Interview voice
+- [x] Rebrand: renamed LearnVerse -> Edu-Crack across app; removed SIH title from landing
+- Tested: backend 36/36 pytest pass, frontend E2E 100% (iterations 1-4)
 
 ## Backlog / Remaining (P1/P2)
 - P1: Authentic Accents — ElevenLabs multilingual voices for natural Tamil/Hindi (DEFERRED: needs user's ElevenLabs API key; currently OpenAI TTS, English-accented)

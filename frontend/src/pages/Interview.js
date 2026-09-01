@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import MicButton from "@/components/MicButton";
 import {
   Video, VideoOff, Loader2, Send, Star, RotateCcw, Mic, Volume2, Circle,
-  History, Play, ChevronDown, ChevronUp, Save,
+  History, Play, ChevronDown, ChevronUp, Save, Pause, Square, StopCircle,
 } from "lucide-react";
 
 const ROLES = ["Software Engineer", "Data Scientist", "Frontend Developer", "ML Engineer", "Backend Developer"];
@@ -22,6 +22,7 @@ export default function Interview() {
   const [avg, setAvg] = useState(0);
   const [camOn, setCamOn] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [records, setRecords] = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -71,16 +72,28 @@ export default function Interview() {
   const speakQuestion = async (text) => {
     try {
       setSpeaking(true);
+      setPaused(false);
       const res = await api.post("/tts", { text, voice: "onyx" });
       const url = BACKEND + res.data.url;
       audioRef.current?.pause();
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.onended = () => setSpeaking(false);
+      audio.onended = () => { setSpeaking(false); setPaused(false); };
       await audio.play();
     } catch {
       setSpeaking(false);
     }
+  };
+
+  const stopSpeaking = () => {
+    if (audioRef.current) { audioRef.current.pause(); try { audioRef.current.currentTime = 0; } catch {} }
+    setSpeaking(false); setPaused(false);
+  };
+
+  const togglePause = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) { a.play(); setPaused(false); } else { a.pause(); setPaused(true); }
   };
 
   const start = async () => {
@@ -282,11 +295,31 @@ export default function Interview() {
               <div className="glass rounded-2xl p-6" data-testid="interview-question">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-mono uppercase tracking-widest text-indigo-400">Question {number} of 5</p>
-                  <button onClick={() => speakQuestion(question)} disabled={speaking}
-                    data-testid="replay-question-btn"
-                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-400 transition-colors disabled:opacity-50">
-                    <Volume2 className="w-3.5 h-3.5" /> {speaking ? "Speaking…" : "Replay"}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {speaking ? (
+                      <>
+                        <button onClick={togglePause} data-testid="pause-speaking-btn"
+                          className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+                          {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                          {paused ? "Resume" : "Pause"}
+                        </button>
+                        <button onClick={stopSpeaking} data-testid="stop-speaking-btn"
+                          className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors">
+                          <Square className="w-3.5 h-3.5 fill-current" /> Stop
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => speakQuestion(question)}
+                        data-testid="replay-question-btn"
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-400 transition-colors">
+                        <Volume2 className="w-3.5 h-3.5" /> Replay
+                      </button>
+                    )}
+                    <button onClick={reset} data-testid="end-interview-btn"
+                      className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors">
+                      <StopCircle className="w-3.5 h-3.5" /> End
+                    </button>
+                  </div>
                 </div>
                 <p className="text-lg leading-relaxed">{question || <Loader2 className="w-5 h-5 animate-spin" />}</p>
                 <div className="flex items-end gap-3 mt-4">
