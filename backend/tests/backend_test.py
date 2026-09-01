@@ -293,3 +293,66 @@ class TestInterview:
         assert r.status_code == 200
         d = r.json()
         assert "score" in d and "feedback" in d
+
+
+# -------- STT (Whisper) — voice answers --------
+class TestSTT:
+    """Round-trip: TTS produces mp3, STT should transcribe (or at least return 200)."""
+
+    def test_stt_roundtrip(self, session, auth):
+        # produce speech
+        r = session.post(f"{API}/tts", headers=auth,
+                         json={"text": "hello learn verse", "voice": "nova"})
+        assert r.status_code == 200
+        url = r.json()["url"]
+        audio_r = requests.get(f"{BASE_URL}{url}", timeout=30)
+        assert audio_r.status_code == 200
+        files = {"file": ("speech.mp3", audio_r.content, "audio/mpeg")}
+        data = {"language": "en"}
+        headers = {"Authorization": auth["Authorization"]}
+        r2 = requests.post(f"{API}/stt", headers=headers, files=files, data=data, timeout=90)
+        assert r2.status_code == 200, r2.text
+        assert "text" in r2.json()
+
+    def test_stt_unauth(self):
+        files = {"file": ("x.wav", b"RIFF0000WAVE", "audio/wav")}
+        r = requests.post(f"{API}/stt", files=files, timeout=30)
+        assert r.status_code == 401
+
+
+# -------- Daily Challenge --------
+class TestDaily:
+    def test_daily_flow(self, session):
+        # Use fresh user so we can submit
+        email = f"daily_{uuid.uuid4().hex[:8]}@example.com"
+        rr = requests.post(f"{API}/auth/register", json={
+            "name": "TEST Daily", "email": email, "password": "pw12345", "mobile": "9222222222"
+        })
+        assert rr.status_code == 200
+        token = rr.json()["token"]
+        h = {"Authorization": f"Bearer {token}"}
+
+        # GET /daily
+        r = requests.get(f"{API}/daily", headers=h, timeout=60)
+        assert r.status_code == 200
+        d = r.json()
+        assert "q" in d and "options" in d and len(d["options"]) >= 2
+        assert d["done"] is False
+
+        # submit
+        r2 = requests.post(f"{API}/daily/submit", headers=h,
+                           json={"answer": 0, "time_taken": 10})
+        assert r2.status_code == 200, r2.text
+        d2 = r2.json()
+        assert "correct" in d2 and "xp" in d2 and "streak" in d2
+
+        # duplicate submit
+        r3 = requests.post(f"{API}/daily/submit", headers=h,
+                           json={"answer": 0, "time_taken": 10})
+        assert r3.status_code == 400
+        assert "Already" in r3.json().get("detail", "")
+
+        # done state
+        r4 = requests.get(f"{API}/daily", headers=h)
+        assert r4.status_code == 200
+        assert r4.json()["done"] is True

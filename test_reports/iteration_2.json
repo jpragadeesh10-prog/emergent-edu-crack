@@ -1,0 +1,21 @@
+{
+  "summary": "Iteration 2 focused on 3 new features: /api/stt (Whisper), Daily Challenge (/api/daily + /api/daily/submit + Dashboard card), and Mock Interview live camera + AI TTS + MicButton. Backend: extended /app/backend/tests/backend_test.py with TestSTT (TTS->STT round-trip returns 200 with transcribed text; unauth returns 401) and TestDaily (GET /daily, submit, duplicate=400 'Already', reload done). Full suite: 29/29 pytest passed. Frontend: seeded auth via /api/auth/register + localStorage lv_token, granted mic+camera permissions, then verified Dashboard daily-challenge card end-to-end (start->select opt->submit->daily-result 'Correct! +25 XP' + '1-day streak' -> reload shows daily-done); Tutor page mic-btn renders and toggles to recording state (rose + animate-pulse classes) with text streaming still working (GPT streamed 'four' for '2+2'); Mock Interview start-interview-btn -> video-stage with AI orb + webcam-video element + replay-question-btn + mic-btn all render, Q1 loads, TTS auto-speaks (Speaking… indicator observed), submit-answer-btn -> next Q2 loaded with 6/10 score and feedback in log. Regression: dashboard stat-xp/stat-streak render.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Login/Register form inputs lack data-testid (only placeholders). Recommend adding data-testid=\"register-name/email/password/mobile\" and \"login-email/password\" + submit buttons for stable automation.",
+    "DailyChallenge submit called with `selected` state; on timer expiry it correctly uses selectedRef, but user-triggered submit uses stale closure if the answer callback is invoked from inside setInterval. Verified working via ref pattern, but consider unifying to a single ref-based submit for consistency.",
+    "Interview page toast 'Failed to start' swallows the underlying error — surface e.response?.data?.detail for better UX/debugging.",
+    "TTS URL construction in Interview.js uses `process.env.REACT_APP_BACKEND_URL + res.data.url` — if REACT_APP_BACKEND_URL has trailing slash it will produce '//api/tts/...'. Currently OK but brittle; consider using axios baseURL or URL join.",
+    "server.py now 970 lines; STT + Daily added to same monolith. Split into routers (auth/chat/tts/quiz/friends/interview/daily/media)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "ravi_test@example.com / pass1234 (seed); tests also register throwaway TEST users",
+  "seed_data_creation": "Registered fresh throwaway users (tst_*, daily_*) for daily-challenge one-per-day flow so seed user was not consumed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: `pytest /app/backend/tests/backend_test.py` (29 tests, ~11s, includes STT round-trip via TTS + Daily flow with duplicate 400). For UI daily-challenge testing, ALWAYS register a fresh user then seed localStorage.lv_token via /api/auth/register response, else the card will show daily-done. Grant permissions=['microphone','camera'] on browser context; MediaRecorder+fake mic works but produces silence — only assert mic-btn renders + class toggles. Fake camera renders a green pattern via chromium flags (already enabled by test env)."
+}

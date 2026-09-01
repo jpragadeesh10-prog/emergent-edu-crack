@@ -35,17 +35,16 @@ tracking · Time Machine · quizzes+badges+leaderboard · friends+search · mock
 - [x] Friends: search by email/mobile/name, request/accept, friends list with XP
 - [x] Subjects library: full backend catalog (92 subjects across 10 categories) with filter
 - [x] Landing + Login pages, animated theme
-- Tested: backend 26/26 pytest pass, frontend E2E 100% (iteration_1.json)
+- [x] Voice Answers: Whisper STT mic button in AI Tutor + Mock Interview (speak instead of type)
+- [x] Live Interview Camera: webcam video-call layout, AI interviewer speaks each question (TTS), replay + voice answers
+- [x] Daily Challenge: 30-second daily spark quiz on dashboard, grows streak, awards XP, one-per-day
+- Tested: backend 29/29 pytest pass, frontend E2E 100% (iteration_1 & iteration_2)
 
 ## Backlog / Remaining (P1/P2)
-- P1: Real WebRTC webcam + live audio for mock interview (currently text-based Q&A)
-- P1: Speech-to-text so students can answer doubts/interviews by voice
-- P1: ElevenLabs multilingual voices for natural Tamil/Hindi accents (OpenAI TTS is English-accented)
+- P1: Authentic Accents — ElevenLabs multilingual voices for natural Tamil/Hindi (DEFERRED: needs user's ElevenLabs API key; currently OpenAI TTS, English-accented)
 - P2: Sandbox hardening for code execution (nsjail/resource limits, no network)
 - P2: Persist chat history sidebar UI; daily activity heatmap visualization
 - P2: Split server.py into routers for maintainability
 
 ## Next Tasks
-- Add voice input (mic) to AI Tutor and Interview
-- Add real webcam video to mock interview
-- Upgrade voice to ElevenLabs for authentic Indian-language accents
+- Add ElevenLabs (once key provided) for authentic Indian-language teacher voices

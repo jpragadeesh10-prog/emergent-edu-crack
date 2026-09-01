@@ -13,14 +13,14 @@ import emoji as emoji_lib
 import jwt
 import bcrypt
 from dotenv import load_dotenv
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
-from emergentintegrations.llm.openai import OpenAITextToSpeech
+from emergentintegrations.llm.openai import OpenAITextToSpeech, OpenAISpeechToText
 
 from subjects_data import SUBJECT_CATALOG, ALL_SUBJECTS, LANGUAGES, TEACHERS
 
@@ -842,6 +842,121 @@ async def interview_answer(body: InterviewAnswerIn, user: dict = Depends(get_cur
 @api_router.get("/")
 async def root():
     return {"message": "LearnVerse API"}
+
+
+# ---------------------------------------------------------------------------
+# Speech-to-text (Whisper) — voice answers
+# ---------------------------------------------------------------------------
+@api_router.post("/stt")
+async def speech_to_text(file: UploadFile = File(...), language: str = Form("en"),
+                         user: dict = Depends(get_current_user)):
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Audio too large (max 25MB)")
+    suffix = ".webm"
+    name = file.filename or ""
+    for ext in (".mp3", ".wav", ".m4a", ".mp4", ".webm", ".mpeg", ".mpga"):
+        if name.lower().endswith(ext):
+            suffix = ext
+            break
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        tmp.write(data)
+        tmp.flush()
+        tmp.close()
+        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+        lang = None if language in ("tanglish", "auto", "") else language
+        with open(tmp.name, "rb") as af:
+            kwargs = {"model": "whisper-1", "response_format": "json"}
+            if lang:
+                kwargs["language"] = lang
+            resp = await stt.transcribe(file=af, **kwargs)
+        text = getattr(resp, "text", "") or ""
+        return {"text": text.strip()}
+    except Exception as e:
+        logger.exception("stt error")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {e}")
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Daily Challenge — 30-second spark quiz
+# ---------------------------------------------------------------------------
+DAILY_SUBJECTS = ["Data Structures", "Algorithms", "Operating Systems", "DBMS",
+                  "Computer Networks", "Mathematics", "Physics", "AI & Machine Learning"]
+
+
+async def _get_or_build_daily():
+    today = now_utc().strftime("%Y-%m-%d")
+    doc = await db.daily_challenges.find_one({"date": today}, {"_id": 0})
+    if doc:
+        return doc
+    subject = DAILY_SUBJECTS[now_utc().timetuple().tm_yday % len(DAILY_SUBJECTS)]
+    sys = ("Return ONLY valid JSON, no fences: "
+           "{\"q\":\"...\",\"options\":[\"a\",\"b\",\"c\",\"d\"],\"answer\":0,\"explain\":\"...\"}. "
+           "One crisp multiple-choice question answerable in 30 seconds.")
+    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"daily_{today}",
+                   system_message=sys).with_model("openai", "gpt-5.4")
+    try:
+        resp = await chat.send_message(UserMessage(text=f"Quick daily quiz question about {subject}."))
+        raw = re.sub(r"^```(json)?|```$", "", resp.strip()).strip()
+        q = json.loads(raw)
+    except Exception:
+        q = {"q": f"Quick warm-up: which is a linear data structure?",
+             "options": ["Tree", "Graph", "Array", "Heap"], "answer": 2,
+             "explain": "An array stores elements linearly in contiguous memory."}
+    doc = {"date": today, "subject": subject, "q": q["q"], "options": q["options"],
+           "answer": q["answer"], "explain": q.get("explain", "")}
+    await db.daily_challenges.insert_one(dict(doc))
+    return doc
+
+
+@api_router.get("/daily")
+async def get_daily(user: dict = Depends(get_current_user)):
+    today = now_utc().strftime("%Y-%m-%d")
+    doc = await _get_or_build_daily()
+    result = await db.daily_results.find_one(
+        {"user_id": user["user_id"], "date": today}, {"_id": 0})
+    return {"date": today, "subject": doc["subject"], "q": doc["q"],
+            "options": doc["options"], "done": bool(result),
+            "last_result": result}
+
+
+@api_router.post("/daily/submit")
+async def submit_daily(body: dict, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    today = now_utc().strftime("%Y-%m-%d")
+    existing = await db.daily_results.find_one({"user_id": uid, "date": today}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Already completed today's challenge")
+    doc = await _get_or_build_daily()
+    chosen = body.get("answer", -1)
+    time_taken = body.get("time_taken", 30)
+    correct = chosen == doc["answer"]
+    xp = (25 if time_taken <= 15 else 15) if correct else 3
+    await db.daily_results.insert_one({
+        "user_id": uid, "date": today, "correct": correct, "xp": xp,
+        "ts": now_utc().isoformat()})
+    await record_activity(uid, doc["subject"], xp=xp, mistake=(not correct))
+    if not correct:
+        await db.mistakes.insert_one({
+            "id": uuid.uuid4().hex, "user_id": uid, "subject": doc["subject"],
+            "topic": "Daily Challenge: " + doc["q"][:50],
+            "detail": f"Correct: {doc['options'][doc['answer']]}", "ts": now_utc().isoformat()})
+    await evaluate_badges(uid)
+    dna = await ensure_dna(uid)
+    activity = dna.get("activity", {})
+    streak = 0
+    d = now_utc()
+    while activity.get(d.strftime("%Y-%m-%d"), 0) > 0:
+        streak += 1
+        d -= timedelta(days=1)
+    return {"correct": correct, "answer": doc["answer"], "explain": doc["explain"],
+            "xp": xp, "streak": streak}
 
 
 app.include_router(api_router)

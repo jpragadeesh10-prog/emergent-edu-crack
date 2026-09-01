@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api, streamChat } from "@/lib/api";
 import { toast } from "sonner";
+import MicButton from "@/components/MicButton";
 import {
   Send, Volume2, Loader2, Sparkles, RefreshCw, Repeat2, Search, GraduationCap,
 } from "lucide-react";
@@ -178,11 +179,12 @@ export default function Tutor() {
 
       {/* input */}
       <div className="mt-4 flex items-end gap-3">
+        <MicButton language={language} onTranscript={(t) => setInput((prev) => (prev ? prev + " " : "") + t)} />
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-          placeholder="Type your doubt…"
+          placeholder="Type your doubt, or tap the mic to speak…"
           data-testid="chat-input"
           rows={1}
           className="flex-1 resize-none bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm outline-none focus:border-indigo-500 transition-colors max-h-32"

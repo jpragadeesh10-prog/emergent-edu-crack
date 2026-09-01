@@ -20,6 +20,20 @@ export function getToken() {
   return localStorage.getItem("lv_token");
 }
 
+export async function uploadAudio(blob, language = "en") {
+  const token = getToken();
+  const fd = new FormData();
+  fd.append("file", blob, "recording.webm");
+  fd.append("language", language);
+  const res = await fetch(`${API}/stt`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) throw new Error("stt failed");
+  return res.json();
+}
+
 // SSE streaming via fetch
 export async function streamChat(body, onDelta, onDone) {
   const token = getToken();

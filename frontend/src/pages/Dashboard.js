@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
+import DailyChallenge from "@/components/DailyChallenge";
 import {
   Flame, TrendingUp, AlertTriangle, Sparkles, Award, Target, Brain, RotateCcw,
 } from "lucide-react";
@@ -64,6 +65,8 @@ export default function Dashboard() {
         <Stat icon={Target} color="text-cyan-400" label="Subjects Touched" value={dna.subjects.length} />
         <Stat icon={Award} color="text-emerald-400" label="Badges" value={badges.filter(b => b.earned).length} />
       </div>
+
+      <DailyChallenge onComplete={load} />
 
       {empty && (
         <div className="glass rounded-2xl p-8 text-center">

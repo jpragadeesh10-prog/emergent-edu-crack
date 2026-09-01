@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Video, Loader2, Send, Star, RotateCcw } from "lucide-react";
+import MicButton from "@/components/MicButton";
+import {
+  Video, VideoOff, Loader2, Send, Star, RotateCcw, Mic, Volume2, Circle,
+} from "lucide-react";
 
 const ROLES = ["Software Engineer", "Data Scientist", "Frontend Developer", "ML Engineer", "Backend Developer"];
 
@@ -15,15 +18,57 @@ export default function Interview() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [avg, setAvg] = useState(0);
+  const [camOn, setCamOn] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const audioRef = useRef(null);
+
+  const stopCam = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCamOn(false);
+  }, []);
+
+  useEffect(() => () => { stopCam(); audioRef.current?.pause(); }, [stopCam]);
+
+  const startCam = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCamOn(true);
+    } catch {
+      toast.error("Camera access denied — you can still answer by text/voice");
+    }
+  };
+
+  const speakQuestion = async (text) => {
+    try {
+      setSpeaking(true);
+      const res = await api.post("/tts", { text, voice: "onyx" });
+      const url = process.env.REACT_APP_BACKEND_URL + res.data.url;
+      audioRef.current?.pause();
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setSpeaking(false);
+      await audio.play();
+    } catch {
+      setSpeaking(false);
+    }
+  };
 
   const start = async () => {
     setBusy(true);
+    await startCam();
     try {
       const res = await api.post("/interview/start", { role });
       setSession(res.data.session_id);
       setQuestion(res.data.question);
       setNumber(res.data.number);
       setLog([]); setDone(false);
+      speakQuestion(res.data.question);
     } catch (e) { toast.error("Failed to start"); }
     finally { setBusy(false); }
   };
@@ -40,15 +85,20 @@ export default function Interview() {
       setAvg(res.data.avg_score);
       if (res.data.done) {
         setDone(true); setQuestion("");
+        speakQuestion(`That's a wrap. Your average score was ${res.data.avg_score} out of 10. Well done.`);
       } else {
         setQuestion(res.data.next_question);
         setNumber(res.data.number);
+        speakQuestion(res.data.next_question);
       }
     } catch (e) { toast.error("Failed"); }
     finally { setBusy(false); }
   };
 
-  const reset = () => { setSession(null); setQuestion(""); setLog([]); setDone(false); setAvg(0); };
+  const reset = () => {
+    setSession(null); setQuestion(""); setLog([]); setDone(false); setAvg(0);
+    audioRef.current?.pause(); setSpeaking(false); stopCam();
+  };
 
   return (
     <div className="space-y-6">
@@ -60,8 +110,11 @@ export default function Interview() {
       {!session && (
         <div className="glass rounded-2xl p-8 max-w-lg">
           <div className="w-14 h-14 orb animate-float mb-5" />
-          <h3 className="font-display text-xl font-semibold mb-2">1-on-1 AI Interviewer</h3>
-          <p className="text-slate-400 text-sm mb-5">Pick a role. The AI asks 5 progressively harder questions and scores each answer with feedback.</p>
+          <h3 className="font-display text-xl font-semibold mb-2">1-on-1 Live AI Interview</h3>
+          <p className="text-slate-400 text-sm mb-5">
+            Turn on your camera and face a real interview. The AI interviewer speaks each question aloud,
+            you answer by voice or text, and get scored feedback after all 5 questions.
+          </p>
           <select value={role} onChange={(e) => setRole(e.target.value)}
             data-testid="role-select"
             className="w-full bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 mb-4 text-slate-200">
@@ -69,7 +122,7 @@ export default function Interview() {
           </select>
           <button onClick={start} disabled={busy} data-testid="start-interview-btn"
             className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 font-semibold px-6 py-3 rounded-full transition-colors active:scale-95 disabled:opacity-50">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />} Start Interview
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />} Start Live Interview
           </button>
         </div>
       )}
@@ -77,14 +130,59 @@ export default function Interview() {
       {session && (
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-5">
+            {/* Video call stage */}
+            <div className="grid grid-cols-2 gap-4" data-testid="video-stage">
+              {/* AI interviewer */}
+              <div className={`relative rounded-2xl overflow-hidden aspect-video bg-slate-900 border transition-colors ${
+                speaking ? "border-indigo-400" : "border-slate-800"
+              }`}>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className={`w-24 h-24 orb ${speaking ? "animate-float" : ""}`} />
+                </div>
+                {speaking && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-full border-2 border-indigo-400" style={{ animation: "pulse-ring 1.2s ease-out infinite" }} />
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 text-xs bg-black/60 px-2 py-1 rounded-lg">
+                  <Volume2 className={`w-3.5 h-3.5 ${speaking ? "text-indigo-400" : "text-slate-500"}`} />
+                  AI Interviewer
+                </div>
+              </div>
+              {/* Candidate webcam */}
+              <div className="relative rounded-2xl overflow-hidden aspect-video bg-slate-900 border border-slate-800">
+                <video ref={videoRef} autoPlay playsInline muted data-testid="webcam-video"
+                  className="w-full h-full object-cover" />
+                {!camOn && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500">
+                    <VideoOff className="w-8 h-8" />
+                    <button onClick={startCam} className="text-xs text-indigo-400 hover:text-indigo-300">Enable camera</button>
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 text-xs bg-black/60 px-2 py-1 rounded-lg">
+                  <Circle className={`w-2.5 h-2.5 ${camOn ? "fill-emerald-400 text-emerald-400" : "fill-slate-500 text-slate-500"}`} /> You
+                </div>
+              </div>
+            </div>
+
             {!done && (
               <div className="glass rounded-2xl p-6" data-testid="interview-question">
-                <p className="text-xs font-mono uppercase tracking-widest text-indigo-400 mb-2">Question {number} of 5</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-mono uppercase tracking-widest text-indigo-400">Question {number} of 5</p>
+                  <button onClick={() => speakQuestion(question)} disabled={speaking}
+                    data-testid="replay-question-btn"
+                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-400 transition-colors disabled:opacity-50">
+                    <Volume2 className="w-3.5 h-3.5" /> {speaking ? "Speaking…" : "Replay"}
+                  </button>
+                </div>
                 <p className="text-lg leading-relaxed">{question || <Loader2 className="w-5 h-5 animate-spin" />}</p>
-                <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
-                  data-testid="answer-input"
-                  placeholder="Type your answer…" rows={5}
-                  className="w-full mt-4 bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 resize-none text-slate-200" />
+                <div className="flex items-end gap-3 mt-4">
+                  <MicButton onTranscript={(t) => setAnswer((p) => (p ? p + " " : "") + t)} />
+                  <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
+                    data-testid="answer-input"
+                    placeholder="Speak with the mic, or type your answer…" rows={3}
+                    className="flex-1 bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 resize-none text-slate-200" />
+                </div>
                 <button onClick={sendAnswer} disabled={busy || !answer.trim()}
                   data-testid="submit-answer-btn"
                   className="mt-3 flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 font-semibold px-6 py-3 rounded-full transition-colors active:scale-95 disabled:opacity-50">
@@ -105,7 +203,6 @@ export default function Interview() {
               </div>
             )}
 
-            {/* transcript */}
             {log.map((l, i) => (
               <div key={i} className="glass rounded-2xl p-5">
                 <p className="text-sm text-slate-400 mb-1"><span className="text-indigo-400 font-mono">Q{i + 1}:</span> {l.q}</p>
@@ -124,7 +221,12 @@ export default function Interview() {
             <h3 className="font-display text-lg font-semibold mb-3">Session</h3>
             <p className="text-sm text-slate-400 mb-2">Role: <span className="text-white">{role}</span></p>
             <p className="text-sm text-slate-400 mb-2">Answered: <span className="text-white">{log.length}/5</span></p>
-            <p className="text-sm text-slate-400">Running avg: <span className="text-amber-400 font-bold">{avg}/10</span></p>
+            <p className="text-sm text-slate-400 mb-4">Running avg: <span className="text-amber-400 font-bold">{avg}/10</span></p>
+            <div className="text-xs text-slate-500 space-y-1.5 border-t border-slate-800 pt-4">
+              <p className="flex items-center gap-2"><Mic className="w-3.5 h-3.5" /> Answer by voice or text</p>
+              <p className="flex items-center gap-2"><Volume2 className="w-3.5 h-3.5" /> Interviewer speaks each question</p>
+              <p className="flex items-center gap-2"><Video className="w-3.5 h-3.5" /> Your camera keeps it real</p>
+            </div>
           </div>
         </div>
       )}
