@@ -2,8 +2,10 @@ import os
 import re
 import uuid
 import json
+import asyncio
 import hashlib
 import logging
+import requests
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
@@ -543,6 +545,7 @@ BADGE_RULES = [
     ("perfect", "Perfectionist", "Scored 100% on a quiz"),
     ("scholar", "Scholar", "Earned 200+ total XP"),
     ("streak3", "On Fire", "3-day learning streak"),
+    ("streak7", "Unstoppable", "7-day daily streak (+100 bonus XP)"),
     ("polymath", "Polymath", "Practised 5+ subjects"),
 ]
 
@@ -566,12 +569,16 @@ async def evaluate_badges(uid: str):
         "perfect": perfect >= 1,
         "scholar": dna.get("total_xp", 0) >= 200,
         "streak3": streak >= 3,
+        "streak7": streak >= 7,
         "polymath": len(subjects) >= 5,
     }
     for code, title, desc in BADGE_RULES:
         if checks.get(code) and code not in existing:
             await db.badges.insert_one({"user_id": uid, "code": code, "title": title,
                                         "desc": desc, "ts": now_utc().isoformat()})
+            # Streak-7 reward: one-time bonus XP
+            if code == "streak7":
+                await db.learning_dna.update_one({"user_id": uid}, {"$inc": {"total_xp": 100}})
             earned.append({"code": code, "title": title, "desc": desc})
     return earned
 
@@ -947,7 +954,6 @@ async def submit_daily(body: dict, user: dict = Depends(get_current_user)):
             "id": uuid.uuid4().hex, "user_id": uid, "subject": doc["subject"],
             "topic": "Daily Challenge: " + doc["q"][:50],
             "detail": f"Correct: {doc['options'][doc['answer']]}", "ts": now_utc().isoformat()})
-    await evaluate_badges(uid)
     dna = await ensure_dna(uid)
     activity = dna.get("activity", {})
     streak = 0
@@ -955,8 +961,114 @@ async def submit_daily(body: dict, user: dict = Depends(get_current_user)):
     while activity.get(d.strftime("%Y-%m-%d"), 0) > 0:
         streak += 1
         d -= timedelta(days=1)
+    new_badges = await evaluate_badges(uid)
+    bonus = 100 if any(b["code"] == "streak7" for b in new_badges) else 0
     return {"correct": correct, "answer": doc["answer"], "explain": doc["explain"],
-            "xp": xp, "streak": streak}
+            "xp": xp, "streak": streak, "new_badges": new_badges, "bonus_xp": bonus}
+
+
+# ---------------------------------------------------------------------------
+# Object storage (mock interview video recordings)
+# ---------------------------------------------------------------------------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+APP_NAME = "learnverse"
+_storage_key = None
+
+
+def init_storage(force: bool = False):
+    global _storage_key
+    if _storage_key and not force:
+        return _storage_key
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = requests.put(f"{STORAGE_URL}/objects/{path}",
+                        headers={"X-Storage-Key": key, "Content-Type": content_type},
+                        data=data, timeout=120)
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.put(f"{STORAGE_URL}/objects/{path}",
+                            headers={"X-Storage-Key": key, "Content-Type": content_type},
+                            data=data, timeout=120)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str):
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}",
+                        headers={"X-Storage-Key": key}, timeout=60)
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}",
+                            headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "video/webm")
+
+
+@api_router.post("/interview/save")
+async def interview_save(session_id: str = Form(...), video: UploadFile = File(None),
+                         user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    intv = await db.interviews.find_one({"session_id": session_id}, {"_id": 0})
+    if not intv or intv["user_id"] != uid:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    qa = intv.get("qa", [])
+    avg = round(sum(x["score"] for x in qa) / len(qa), 1) if qa else 0
+    video_path = None
+    if video is not None:
+        data = await video.read()
+        if len(data) > 200 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Recording too large (max 200MB)")
+        if data:
+            path = f"{APP_NAME}/interviews/{uid}/{uuid.uuid4().hex}.webm"
+            try:
+                result = await asyncio.to_thread(put_object, path, data, "video/webm")
+                video_path = result["path"]
+            except Exception as e:
+                logger.error(f"video upload failed: {e}")
+    rec_id = uuid.uuid4().hex
+    await db.interview_records.insert_one({
+        "id": rec_id, "user_id": uid, "role": intv["role"], "qa": qa, "avg_score": avg,
+        "video_path": video_path, "is_deleted": False, "created_at": now_utc().isoformat()})
+    return {"id": rec_id, "avg_score": avg, "has_video": bool(video_path)}
+
+
+@api_router.get("/interview/records")
+async def interview_records(user: dict = Depends(get_current_user)):
+    rows = await db.interview_records.find(
+        {"user_id": user["user_id"], "is_deleted": False}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return [{"id": r["id"], "role": r["role"], "avg_score": r["avg_score"],
+             "qa": r["qa"], "has_video": bool(r.get("video_path")),
+             "created_at": r["created_at"]} for r in rows]
+
+
+@api_router.get("/interview/video/{record_id}")
+async def interview_video(record_id: str, auth: str = None):
+    # auth via query param since <video src> cannot send headers
+    if not auth:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(auth, JWT_SECRET, algorithms=[JWT_ALG])
+        uid = payload["user_id"]
+    except jwt.PyJWTError:
+        session = await db.user_sessions.find_one({"session_token": auth}, {"_id": 0})
+        if not session:
+            raise HTTPException(status_code=401, detail="Invalid session")
+        uid = session["user_id"]
+    rec = await db.interview_records.find_one(
+        {"id": record_id, "user_id": uid, "is_deleted": False}, {"_id": 0})
+    if not rec or not rec.get("video_path"):
+        raise HTTPException(status_code=404, detail="Video not found")
+    data, ctype = await asyncio.to_thread(get_object, rec["video_path"])
+    return Response(content=data, media_type=ctype)
 
 
 app.include_router(api_router)
@@ -967,6 +1079,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup():
+    try:
+        await asyncio.to_thread(init_storage)
+        logger.info("Object storage initialized")
+    except Exception as e:
+        logger.error(f"Storage init failed (non-fatal): {e}")
 
 
 @app.on_event("shutdown")

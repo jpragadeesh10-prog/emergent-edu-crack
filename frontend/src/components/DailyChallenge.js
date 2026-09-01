@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 import confetti from "canvas-confetti";
-import { Zap, Clock, Check, X, Flame, Loader2 } from "lucide-react";
+import { Zap, Clock, Check, X, Flame, Loader2, Award } from "lucide-react";
 
 export default function DailyChallenge({ onComplete }) {
   const [data, setData] = useState(null);
@@ -24,6 +25,10 @@ export default function DailyChallenge({ onComplete }) {
       const res = await api.post("/daily/submit", { answer, time_taken });
       setResult(res.data);
       if (res.data.correct) confetti({ particleCount: 90, spread: 70, origin: { y: 0.4 } });
+      if (res.data.bonus_xp > 0) {
+        confetti({ particleCount: 160, spread: 100, origin: { y: 0.4 } });
+      }
+      (res.data.new_badges || []).forEach((b) => toast.success(`🏆 Badge unlocked: ${b.title}`));
       onComplete && onComplete();
     } catch (e) {
       const detail = e.response?.data?.detail;
@@ -120,6 +125,11 @@ export default function DailyChallenge({ onComplete }) {
               <p className="text-sm text-slate-300 mt-1">Answer: <span className="font-semibold">{data.options[result.answer]}</span></p></>
           )}
           <p className="text-sm text-slate-400 mt-2 max-w-sm mx-auto">{result.explain}</p>
+          {result.bonus_xp > 0 && (
+            <p className="text-sm text-amber-300 font-bold mt-3 flex items-center justify-center gap-1" data-testid="streak-bonus">
+              <Award className="w-4 h-4" /> Unstoppable! +{result.bonus_xp} bonus XP for a 7-day streak
+            </p>
+          )}
           <p className="text-sm text-amber-400 font-bold mt-3 flex items-center justify-center gap-1">
             <Flame className="w-4 h-4" /> {result.streak}-day streak
           </p>

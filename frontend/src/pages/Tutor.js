@@ -3,7 +3,7 @@ import { api, streamChat } from "@/lib/api";
 import { toast } from "sonner";
 import MicButton from "@/components/MicButton";
 import {
-  Send, Volume2, Loader2, Sparkles, RefreshCw, Repeat2, Search, GraduationCap,
+  Send, Volume2, VolumeX, Loader2, Sparkles, RefreshCw, Repeat2, Search, GraduationCap,
 } from "lucide-react";
 
 function renderContent(text) {
@@ -44,6 +44,7 @@ export default function Tutor() {
   const [teacher, setTeacher] = useState("prof");
   const [mode, setMode] = useState("solve");
   const [speaking, setSpeaking] = useState(null);
+  const [autoRead, setAutoRead] = useState(false);
   const endRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -54,17 +55,19 @@ export default function Tutor() {
     if (!input.trim() || streaming) return;
     const q = input.trim();
     setInput("");
+    const assistantIdx = messages.length + 1;
     setMessages((m) => [...m, { role: "user", content: q }, { role: "assistant", content: "" }]);
     setStreaming(true);
+    let acc = "";
     try {
       await streamChat(
         { message: q, session_id: sessionId, subject, language, teacher, mode },
-        (delta) => setMessages((m) => {
+        (delta) => { acc += delta; setMessages((m) => {
           const copy = [...m];
           copy[copy.length - 1] = { role: "assistant", content: copy[copy.length - 1].content + delta };
           return copy;
-        }),
-        () => setStreaming(false),
+        }); },
+        () => { setStreaming(false); if (autoRead && acc.trim()) speak(acc, assistantIdx); },
       );
     } catch (e) {
       toast.error("Chat failed");
@@ -116,6 +119,14 @@ export default function Tutor() {
         <Select value={teacher} onChange={setTeacher} testid="teacher-select"
           options={(catalog?.teachers || []).map((t) => t.id)}
           labels={Object.fromEntries((catalog?.teachers || []).map((t) => [t.id, t.name]))} />
+        <button onClick={() => setAutoRead((v) => !v)} data-testid="autoread-toggle"
+          title={autoRead ? "Auto read-aloud on" : "Auto read-aloud off"}
+          className={`p-2.5 rounded-xl transition-colors ${
+            autoRead ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+              : "glass text-slate-400 hover:border-indigo-400/60"
+          }`}>
+          {autoRead ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        </button>
         <button onClick={newChat} data-testid="new-chat-btn"
           className="p-2.5 rounded-xl glass hover:border-indigo-400/60 transition-colors" title="New chat">
           <RefreshCw className="w-4 h-4" />

@@ -38,7 +38,10 @@ tracking · Time Machine · quizzes+badges+leaderboard · friends+search · mock
 - [x] Voice Answers: Whisper STT mic button in AI Tutor + Mock Interview (speak instead of type)
 - [x] Live Interview Camera: webcam video-call layout, AI interviewer speaks each question (TTS), replay + voice answers
 - [x] Daily Challenge: 30-second daily spark quiz on dashboard, grows streak, awards XP, one-per-day
-- Tested: backend 29/29 pytest pass, frontend E2E 100% (iteration_1 & iteration_2)
+- [x] Streak Rewards: 'Unstoppable' badge + 100 bonus XP at 7-day streak, celebrated on the daily card
+- [x] Interview Recording: sessions recorded to object storage, 'Past Interviews' history with video replay + feedback
+- [x] Voice Read-Aloud: auto-speak toggle in AI Tutor reads each answer aloud after streaming
+- Tested: backend 33/33 pytest pass, frontend E2E 100% (iterations 1-3)
 
 ## Backlog / Remaining (P1/P2)
 - P1: Authentic Accents — ElevenLabs multilingual voices for natural Tamil/Hindi (DEFERRED: needs user's ElevenLabs API key; currently OpenAI TTS, English-accented)

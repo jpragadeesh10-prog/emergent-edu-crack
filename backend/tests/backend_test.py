@@ -356,3 +356,149 @@ class TestDaily:
         r4 = requests.get(f"{API}/daily", headers=h)
         assert r4.status_code == 200
         assert r4.json()["done"] is True
+
+
+
+# -------- Streak Rewards (7-day streak -> Unstoppable + 100 bonus XP) --------
+from datetime import datetime, timedelta, timezone  # noqa: E402
+from pymongo import MongoClient  # noqa: E402
+
+
+def _mongo():
+    url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+    dbn = os.environ.get("DB_NAME", "test_database")
+    return MongoClient(url)[dbn]
+
+
+class TestStreakRewards:
+    def test_streak7_bonus_and_badge(self):
+        # fresh user
+        email = f"streak_{uuid.uuid4().hex[:8]}@example.com"
+        rr = requests.post(f"{API}/auth/register", json={
+            "name": "TEST Streak", "email": email, "password": "pw12345", "mobile": "9333333333"
+        })
+        assert rr.status_code == 200
+        token = rr.json()["token"]
+        user_id = rr.json()["user"]["user_id"]
+        h = {"Authorization": f"Bearer {token}"}
+
+        # Seed 6 previous days of activity via mongo
+        db = _mongo()
+        today = datetime.now(timezone.utc)
+        activity = {}
+        for i in range(1, 7):  # yesterday..6 days ago
+            d = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+            activity[d] = 2
+        db.learning_dna.update_one(
+            {"user_id": user_id},
+            {"$set": {"activity": activity}},
+            upsert=True,
+        )
+
+        # Get baseline XP
+        r0 = requests.get(f"{API}/dna", headers=h)
+        assert r0.status_code == 200
+        xp_before = r0.json().get("total_xp", 0)
+
+        # Ensure daily challenge exists
+        rd = requests.get(f"{API}/daily", headers=h, timeout=60)
+        assert rd.status_code == 200
+
+        # Submit daily -> should trigger streak=7, bonus_xp=100, Unstoppable
+        r = requests.post(f"{API}/daily/submit", headers=h,
+                         json={"answer": 0, "time_taken": 10})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["streak"] == 7, f"expected streak=7 got {d['streak']}"
+        assert d["bonus_xp"] == 100, f"expected bonus_xp=100 got {d['bonus_xp']}"
+        codes = [b["code"] for b in d["new_badges"]]
+        assert "streak7" in codes, f"Unstoppable badge missing: {codes}"
+
+        # Verify XP includes the +100
+        r2 = requests.get(f"{API}/dna", headers=h)
+        xp_after = r2.json().get("total_xp", 0)
+        assert xp_after >= xp_before + 100, f"xp not incremented by bonus: {xp_before}->{xp_after}"
+
+        # Badges endpoint reflects Unstoppable earned
+        rb = requests.get(f"{API}/badges", headers=h)
+        assert rb.status_code == 200
+        unstop = [b for b in rb.json() if b["code"] == "streak7"]
+        assert unstop and unstop[0]["earned"] is True
+
+    def test_no_bonus_below_7(self):
+        # fresh user with no prior activity -> streak=1, bonus=0
+        email = f"nostreak_{uuid.uuid4().hex[:8]}@example.com"
+        rr = requests.post(f"{API}/auth/register", json={
+            "name": "TEST NoStreak", "email": email, "password": "pw12345", "mobile": "9444444444"
+        })
+        token = rr.json()["token"]
+        h = {"Authorization": f"Bearer {token}"}
+        requests.get(f"{API}/daily", headers=h, timeout=60)
+        r = requests.post(f"{API}/daily/submit", headers=h,
+                         json={"answer": 0, "time_taken": 10})
+        assert r.status_code == 200
+        d = r.json()
+        assert d["bonus_xp"] == 0
+        assert d["streak"] < 7
+        codes = [b["code"] for b in d["new_badges"]]
+        assert "streak7" not in codes
+
+
+# -------- Interview Recording (save/records/video) --------
+class TestInterviewRecording:
+    def test_save_records_and_video(self, session, auth, seed_token):
+        # start + answer twice to get a session with qa
+        r = session.post(f"{API}/interview/start", headers=auth,
+                         json={"role": "Backend Engineer"}, timeout=60)
+        assert r.status_code == 200
+        sid = r.json()["session_id"]
+        r = session.post(f"{API}/interview/answer", headers=auth,
+                         json={"session_id": sid, "answer": "Use B-tree indexes to speed lookups."},
+                         timeout=60)
+        assert r.status_code == 200
+
+        # tiny fake webm bytes; server just uploads whatever we send
+        fake_video = b"\x1a\x45\xdf\xa3" + os.urandom(2048)  # EBML header + noise
+        files = {"video": ("interview.webm", fake_video, "video/webm")}
+        data = {"session_id": sid}
+        headers = {"Authorization": auth["Authorization"]}
+        rs = requests.post(f"{API}/interview/save", headers=headers,
+                          files=files, data=data, timeout=120)
+        assert rs.status_code == 200, rs.text
+        js = rs.json()
+        assert "id" in js and "avg_score" in js and "has_video" in js
+        rec_id = js["id"]
+        assert js["has_video"] is True
+
+        # Records list contains it with qa + avg_score
+        rl = requests.get(f"{API}/interview/records", headers=headers, timeout=30)
+        assert rl.status_code == 200
+        rows = rl.json()
+        found = [x for x in rows if x["id"] == rec_id]
+        assert found, "saved record not in list"
+        rec = found[0]
+        assert rec["has_video"] is True
+        assert isinstance(rec["qa"], list) and len(rec["qa"]) >= 1
+        assert "avg_score" in rec
+
+        # Video fetch with auth query param -> 200 with bytes
+        rv = requests.get(f"{API}/interview/video/{rec_id}", params={"auth": seed_token}, timeout=60)
+        assert rv.status_code == 200
+        assert len(rv.content) > 0
+
+        # Unauthenticated -> 401
+        ru = requests.get(f"{API}/interview/video/{rec_id}", timeout=30)
+        assert ru.status_code == 401
+
+    def test_save_without_video(self, session, auth):
+        r = session.post(f"{API}/interview/start", headers=auth,
+                         json={"role": "Data Scientist"}, timeout=60)
+        sid = r.json()["session_id"]
+        session.post(f"{API}/interview/answer", headers=auth,
+                    json={"session_id": sid, "answer": "Cross-validation avoids overfitting."},
+                    timeout=60)
+        headers = {"Authorization": auth["Authorization"]}
+        rs = requests.post(f"{API}/interview/save", headers=headers,
+                          data={"session_id": sid}, timeout=60)
+        assert rs.status_code == 200
+        assert rs.json()["has_video"] is False
