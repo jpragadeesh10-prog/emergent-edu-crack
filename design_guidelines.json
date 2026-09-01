@@ -1,0 +1,131 @@
+{
+  "project_name": "SIH Student Innovation Learning Platform",
+  "design_archetype": "Electric Cyber-Academic & Performance Pro Hybrid",
+  "theme_strategy": "Vibrant Dark Base (#0B0F19) with Dynamic Glow Accents + High-Contrast Light Mode Support",
+  "typography": {
+    "heading_font": "Space Grotesk / Plus Jakarta Sans",
+    "body_font": "Plus Jakarta Sans / Inter",
+    "code_font": "JetBrains Mono / Fira Code",
+    "pairing_archetype": "The Editorial Future (Wide Display Sans + Geometric Tech Body)",
+    "rules": {
+      "h1_hero": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-none",
+      "h2_section": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3_subsection": "text-xl sm:text-2xl font-semibold tracking-normal",
+      "h4_card": "text-lg sm:text-xl font-medium",
+      "overlines": "text-xs font-mono uppercase tracking-[0.2em] text-indigo-400 font-semibold",
+      "body": "text-base leading-relaxed text-slate-300 dark:text-slate-300 light:text-slate-700",
+      "code": "font-mono text-sm leading-snug"
+    }
+  },
+  "colors": {
+    "palette_type": "Electric High Contrast Cyber-Academic",
+    "background_dark": "#0B0F19",
+    "surface_dark": "#111827",
+    "surface_card": "#1E293B",
+    "surface_border": "#334155",
+    "primary": {
+      "main": "#6366F1",
+      "hover": "#4F46E5",
+      "light": "#818CF8",
+      "glow": "rgba(99, 102, 241, 0.35)"
+    },
+    "secondary_cyan": {
+      "main": "#06B6D4",
+      "hover": "#0891B2",
+      "glow": "rgba(6, 182, 212, 0.35)"
+    },
+    "accent_amber": {
+      "main": "#F59E0B",
+      "hover": "#D97706",
+      "badge": "#FEF3C7"
+    },
+    "accent_emerald": {
+      "main": "#10B981",
+      "hover": "#059669",
+      "glow": "rgba(16, 185, 129, 0.3)"
+    },
+    "accent_rose": {
+      "main": "#F43F5E",
+      "hover": "#E11D48"
+    },
+    "gradients": {
+      "hero_text": "bg-gradient-to-r from-indigo-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent",
+      "card_accent": "bg-gradient-to-br from-indigo-900/40 via-slate-900 to-cyan-950/40",
+      "border_beam": "from-transparent via-indigo-500 to-transparent"
+    },
+    "forbidden_colors": [
+      "#7351B7",
+      "#1B93A4"
+    ]
+  },
+  "spacing_and_layout": {
+    "spacing_scale": "Tailwind standard (p-4, p-6, p-8, p-12, p-16, p-24)",
+    "container_padding": "px-4 sm:px-6 lg:px-12 py-8 lg:py-16",
+    "bento_grid_mode": "Tetris Grid (MODE A) for Features / High Density Grid (MODE B) for Learning DNA & Analytics Dashboard",
+    "grid_gap": "gap-6 lg:gap-8",
+    "alignment_rules": "Mobile-first column-1, asymmetric desktop grid, direct children for grid items"
+  },
+  "motion_and_3d": {
+    "libraries": [
+      "framer-motion",
+      "lucide-react",
+      "@react-three/fiber",
+      "@react-three/drei",
+      "canvas-confetti",
+      "react-fast-marquee"
+    ],
+    "3d_scene_strategy": {
+      "hero_3d": "Interactive 3D Brain/Node Mesh visualizer built with Canvas/Three.js or Three.js fallback canvas with float ambient lighting, particle constellation, and interactive rotatable node network representing Learning DNA",
+      "lighting": "Ambient light intensity 0.8 + PointLight color indigo/cyan with intensity 1.5 for crisp 3D depth"
+    },
+    "micro_interactions": {
+      "hover_cards": "hover:-translate-y-1.5 hover:shadow-[0_12px_30px_rgba(99,102,241,0.25)] transition-all duration-300 border-indigo-500/30",
+      "button_click": "active:scale-95 transition-transform",
+      "glow_border": "1px solid rgba(99, 102, 241, 0.2) hover:border-indigo-400/60"
+    }
+  },
+  "key_features_ui_spec": {
+    "google_auth": "Real-time Google OAuth simulation + email fallback, persistent localStorage state, user profile avatar menu",
+    "ai_chat_solver": "ChatGPT-style streaming UI with subject tags (Tamil, Tanglish, Maths, CSE, Physics, Chemistry, Mechanical, AIDS, Autonomous college syllabus), formula formatter, Explain It Back toggle, and voice speak button",
+    "learning_dna": "Circular SVG progress rings starting at 0 and growing daily, activity heatmaps, AI Blind Spot Detector cards, AI Time Machine timeline (Strong/Improving/Needs Revision)",
+    "ai_human_teacher": "Avatar video/speech simulator, teacher selector (Dr. APJ Abdul Kalam style mentor, Tech Professor, Socratic Guide, Tanglish Buddy), language & accent selector, real-time Web Speech API / TTS audio player",
+    "leetcode_compiler": "Multi-language code editor (Python, JS, C, C++, Java), sample problem loader, real-time code execution simulator, input test cases, terminal output console",
+    "mock_interview": "1-to-1 video interview simulator with live webcam stream, AI interviewer speech, transcript log, voice answer recording, score breakdown",
+    "gamification": "Quizzes with live timer, badges/achievements unlock system, friends leaderboard, mobile number search and friend request system"
+  },
+  "image_urls": {
+    "hero_ai_brain": "https://images.unsplash.com/photo-1674027215016-0a4abfdbf1cc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NxAzNDR8MHwxfHNlYXJjaHwzfHxmdXR1cmlzdGljJTIwM0QlMjBBSSUyMGJyYWluJTIwZWR1Y3F0aW9uJTIwdGVjaG5vbG9neXxlbnwwfHx8fDE3ODgyNjU4MzF8MA&ixlib=rb-4.1.0&q=85",
+    "hero_network": "https://images.unsplash.com/photo-1573511860302-28c524319d2a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NxAzNDR8MHwxfHNlYXJjaHwxfHxmdXR1cmlzdGljJTIwM0QlMjBBSSUyMGJyYWluJTIwZWR1Y3F0aW9uJTIwdGVjaG5vbG9neXxlbnwwfHx8fDE3ODgyNjU4MzF8MA&ixlib=rb-4.1.0&q=85",
+    "students_collaborating": "https://images.unsplash.com/photo-1694532415679-13a10fb3d519?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4TjAzOTB8MHwxfHNlYXJjaHwzfHxpbmRpYW4lMjB0ZWNoJTIwc3R1ZGVudCUyMGxlYXJuaW5nJTIwY29kaW5nJTIwcm9ib3RpY3N8ZW58MHx8fHwxNzg4MjY1ODMxfDA&ixlib=rb-4.1.0&q=85",
+    "student_presenter": "https://images.unsplash.com/photo-1697759042426-848c5f3b68b3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4TjAzOTB8MHwxfHNlYXJjaHwyfHxpbmRpYW4lMjB0ZWNoJTIwc3R1ZGVudCUyMGxlYXJuaW5nJTIwY29kaW5nJTIwcm9ib3RpY3N8ZW58MHx8fHwxNzg4MjY1ODMxfDA&ixlib=rb-4.1.0&q=85",
+    "teacher_avatars": [
+      {
+        "name": "Dr. Vikram Sarabhai (Science Lead)",
+        "url": "https://images.unsplash.com/photo-1787647560526-655b78e31453?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBhdmF0YXIlMjBwb3J0cmFpdCUyMHN0dWRlbnQlMjBtZW50b3J8ZW58MHx8fHwxNzg4MjY1ODMxfDA&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "name": "Prof. Ananya Sharma (Code & AI Expert)",
+        "url": "https://images.unsplash.com/photo-1698072556956-1a5d2307a7a1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBhdmF0YXIlMjBwb3J0cmFpdCUyMHN0dWRlbnQlMjBtZW50b3J8ZW58MHx8fHwxNzg4MjY1ODMxfDA&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "name": "Karthik Subramanian (Tanglish & Math Guide)",
+        "url": "https://images.unsplash.com/photo-1653587049840-3a66a91ce4d0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBhdmF0YXIlMjBwb3J0cmFpdCUyMHN0dWRlbnQlMjBtZW50b3J8ZW58MHx8fHwxNzg4MjY1ODMxfDA&ixlib=rb-4.1.0&q=85"
+      }
+    ]
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic outputs. In frontend design, this creates what users call AI slop aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (e.g., transition: all). Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container (.App { text-align: center; }).",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 for main icons. Use Lucide React icons instead.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures, noise overlays, custom selection states, and loading animations separate good from extraordinary.",
+    "All interactive and key informational elements MUST include a data-testid attribute to facilitate robust automated testing (e.g., data-testid='google-login-btn', data-testid='ai-chat-input')."
+  ]
+}
